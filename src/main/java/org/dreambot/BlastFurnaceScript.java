@@ -340,7 +340,7 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
                 (Inventory.contains(STEEL_BAR_ID) ? "steel" : "iron") + 
                 "), going to bank");
             state = State.WALKING_TO_BANK;
-            return 600;
+            return 100;
         }
 
         GameObject dispenser = GameObjects.closest("Bar dispenser");
