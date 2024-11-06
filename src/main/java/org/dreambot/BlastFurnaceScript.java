@@ -24,62 +24,73 @@ import java.awt.Graphics;
 
 /*
  * BlastFurnaceScript.java
- * Purpose: Automates the steel bar smelting process at the Blast Furnace
- * Key functionality:
- * - Handles coal bag filling and ore management
- * - Navigates between bank, conveyor, and bar dispenser
- * - Maintains efficient steel bar production cycle
+ * 
+ * A DreamBot script that automates steel bar production at the Blast Furnace.
+ * 
+ * Core functionality:
+ * - Banks and manages resources (coal, iron ore)
+ * - Handles coal bag filling and emptying
+ * - Operates conveyor belt and bar dispenser
+ * - Manages stamina potions for run energy
+ * - Tracks XP gains and runtime
+ * 
+ * Requirements:
+ * - Ice gloves equipped
+ * - Coal bag in bank
+ * - Stamina potions (optional)
+ * 
+ * Process flow:
+ * 1. Fill coal bag at bank
+ * 2. Withdraw iron ore
+ * 3. Deposit both at conveyor
+ * 4. Collect bars from dispenser
+ * 5. Bank bars and repeat
  */
 @ScriptManifest(
     name = "DreamBot Steel Bar Smelter", 
-    description = "Smelts steel bars at Blast Furnace", 
+    description = "Efficient steel bar production at Blast Furnace", 
     author = "DreamBot",
     version = 1.0, 
     category = Category.SMITHING
 )
 public class BlastFurnaceScript extends AbstractScript implements PaintListener {
 
-    // Script state management
+    // State management
     private State state;
     private boolean coalBagFull = false;
     
-    // Game item IDs for resources and tools
+    // Resource IDs
     private static final int IRON_ORE_ID = 440;
     private static final int COAL_ID = 453;
     private static final int STEEL_BAR_ID = 2353;
-    private static final int COAL_BAG_ID = 12019;  // Coal bag from Motherlode mine
-    private static final int IRON_BAR_ID = 2351;  // Add this with other item IDs
+    private static final int IRON_BAR_ID = 2351;
+    private static final int COAL_BAG_ID = 12019;
     
-    // Important locations in the Blast Furnace area
-    private static final Tile CONVEYOR_BELT_TILE = new Tile(1942, 4967, 0);
-    private static final Tile BAR_DISPENSER_TILE = new Tile(1939, 4963, 0);
-    private static final Area BLAST_FURNACE_AREA = new Area(1934, 4958, 1954, 4974, 0);
-
-    // Add tracking variables
-    private long startTime;
-    private int startXP;
-    private int barsMade;
-    
-    // Current GE prices
-    private static final int COAL_PRICE = 140;
-    private static final int IRON_ORE_PRICE = 195;
-    private static final int STEEL_BAR_PRICE = 550;
-
-    // Add these constants
+    // Stamina potion IDs (4 to 1 dose)
     private static final int STAMINA_POTION_4_ID = 12625;
     private static final int STAMINA_POTION_3_ID = 12627;
     private static final int STAMINA_POTION_2_ID = 12629;
     private static final int STAMINA_POTION_1_ID = 12631;
     private static final int RUN_ENERGY_THRESHOLD = 30;
+    
+    // Blast Furnace locations
+    private static final Tile CONVEYOR_BELT_TILE = new Tile(1942, 4967, 0);
+    private static final Tile BAR_DISPENSER_TILE = new Tile(1939, 4963, 0);
+    private static final Area BLAST_FURNACE_AREA = new Area(1934, 4958, 1954, 4974, 0);
+
+    // Performance tracking
+    private long startTime;
+    private int startXP;
+    private int barsMade;
 
     /**
-     * Represents the different states the script can be in during execution.
-     * States follow the logical flow of the steel bar creation process.
+     * Script states representing each stage of the steel bar production process.
+     * The script transitions between these states in a cycle to maintain continuous production.
      */
     private enum State {
-        BANKING,             // Getting resources from bank
+        BANKING,             // Managing resources and stamina potions
         DEPOSITING_ORE,     // Putting ores on conveyor belt
-        COLLECTING_BARS,    // Collecting finished bars from dispenser
+        COLLECTING_BARS,    // Taking completed bars from dispenser
         WALKING_TO_BANK,    // Moving to bank location
         WALKING_TO_CONVEYOR,// Moving to conveyor belt
         WALKING_TO_COLLECTOR// Moving to bar dispenser
@@ -292,17 +303,18 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
         if (coalBagFull) {
             Logger.log("Attempting to empty coal bag...");
             if (Inventory.interact(COAL_BAG_ID, "Empty")) {
-                if (Sleep.sleepUntil(() -> Inventory.contains(COAL_ID), 3000)) {
+                if (Sleep.sleepUntil(() -> Inventory.contains(COAL_ID), 1200)) {
                     Logger.log("Coal bag emptied");
                     
                     // Now deposit the coal
                     GameObject conveyor = GameObjects.closest("Conveyor belt");
                     if (conveyor != null && conveyor.canReach()) {
                         if (conveyor.interact("Put-ore-on")) {
-                            if (Sleep.sleepUntil(() -> !Inventory.contains(COAL_ID), 5000)) {
+                            if (Sleep.sleepUntil(() -> !Inventory.contains(COAL_ID), 2000)) {
                                 Logger.log("Coal deposited successfully");
                                 coalBagFull = false;
                                 state = State.WALKING_TO_COLLECTOR;
+                                return 100;
                             }
                         }
                     }
@@ -420,14 +432,14 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
      * @return Sleep duration in milliseconds
      */
     private int walkToCollector() {
-        // Give 5 seconds to reach the collector
+        // Give 3 seconds to reach the collector
         long startTime = System.currentTimeMillis();
         
-        while (System.currentTimeMillis() - startTime < 5000) {
+        while (System.currentTimeMillis() - startTime < 3000) {
             GameObject dispenser = GameObjects.closest("Bar dispenser");
             if (dispenser != null && dispenser.canReach()) {
                 state = State.COLLECTING_BARS;
-                return 600;
+                return 100;
             }
             
             // Only log walking message once every 2 seconds
@@ -435,13 +447,13 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
                 Logger.log("Walking to bar dispenser...");
             }
             Walking.walk(BAR_DISPENSER_TILE);
-            Sleep.sleep(600);
+            Sleep.sleep(300);
         }
         
-        // If we haven't reached collector in 5 seconds, retry from conveyor
+        // If we haven't reached collector in 3 seconds, retry from conveyor
         Logger.log("Failed to reach collector, retrying from conveyor");
         state = State.WALKING_TO_CONVEYOR;
-        return 600;
+        return 100;
     }
 
     /**
@@ -459,7 +471,7 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
     public void onPaint(Graphics g) {
         // Create a semi-transparent black background
         g.setColor(new Color(0, 0, 0, 180));
-        g.fillRect(5, 5, 200, 130);  // Increased height for additional stats
+        g.fillRect(5, 5, 250, 100);  
 
         // Set text color to white
         g.setColor(Color.WHITE);
