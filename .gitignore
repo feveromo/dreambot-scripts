@@ -1,0 +1,7 @@
+# ignore the target folder
+target/
+
+# ignore the .vscode folder
+.vscode/
+
+target/db-scripts-1.0-SNAPSHOT.jar
