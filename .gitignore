@@ -3,8 +3,3 @@ target/
 
 # ignore the .vscode folder
 .vscode/
-
-target/db-scripts-1.0-SNAPSHOT.jar
-target/db-scripts-1.0-SNAPSHOT.jar
-target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst
-target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst
