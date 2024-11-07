@@ -1,22 +1,21 @@
 package org.dreambot.serum;
 
 import org.dreambot.api.methods.container.impl.Inventory;
+import org.dreambot.api.utilities.Sleep;
 
 public class CleanHerbsTask extends Task {
-    private static final int SNAKEWEED_UNCLEANED = 3051;  // Correct ID for uncleaned snakeweed
-    private static final int SNAKEWEED_CLEANED = 3052;    // Correct ID for cleaned snakeweed
-    
+    private static final int GRIMY_SNAKEWEED = 1525;
+
     @Override
     public boolean accept() {
-        return Inventory.contains(SNAKEWEED_UNCLEANED) &&
-               !Inventory.contains(SNAKEWEED_CLEANED);
+        return Inventory.contains(GRIMY_SNAKEWEED);
     }
 
     @Override
     public int execute() {
-        if (Inventory.interact(SNAKEWEED_UNCLEANED, "Clean")) {
-            sleep(sleepMod());
+        if (Inventory.interact(GRIMY_SNAKEWEED, "Clean")) {
+            Sleep.sleepUntil(() -> !Inventory.contains(GRIMY_SNAKEWEED), 2000);
         }
-        return 600;
+        return 200;
     }
 } 

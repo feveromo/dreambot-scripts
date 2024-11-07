@@ -29,58 +29,29 @@ public class SerumGUI extends JFrame {
 
     private void initComponents() {
         // Main panel with grid layout
-        JPanel mainPanel = new JPanel(new GridLayout(5, 1, 5, 5));
+        JPanel mainPanel = new JPanel(new GridLayout(3, 1, 5, 5));
         mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Checkboxes - default to unchecked for optional tasks
-        JCheckBox makeSerumsBox = new JCheckBox("Make Sanfew Serums", false);
+        // Checkboxes - cleaning unchecked by default
         JCheckBox cleanHerbsBox = new JCheckBox("Clean Herbs", false);
-        JCheckBox tickManipBox = new JCheckBox("Use Tick Manipulation", true);
-        JCheckBox sellGEBox = new JCheckBox("Sell on Grand Exchange", false);
-
-        // Update config with default values
-        config.setMakeSerums(false);
-        config.setCleanHerbs(false);
-        config.setUseTickManipulation(true);
-        config.setSellOnGE(false);
+        JCheckBox makeSerumsBox = new JCheckBox("Make Sanfew Serums", false);
 
         // Start button
         JButton startButton = new JButton("Start Script");
         startButton.addActionListener(e -> {
             if (script != null) {
                 // Save final config values
-                config.setMakeSerums(makeSerumsBox.isSelected());
                 config.setCleanHerbs(cleanHerbsBox.isSelected());
-                config.setUseTickManipulation(tickManipBox.isSelected());
-                config.setSellOnGE(sellGEBox.isSelected());
+                config.setMakeSerums(makeSerumsBox.isSelected());
                 
                 script.setStarted(true);
                 dispose();
             }
         });
 
-        // Add action listeners for real-time config updates
-        makeSerumsBox.addActionListener(e -> config.setMakeSerums(makeSerumsBox.isSelected()));
-        cleanHerbsBox.addActionListener(e -> config.setCleanHerbs(cleanHerbsBox.isSelected()));
-        tickManipBox.addActionListener(e -> config.setUseTickManipulation(tickManipBox.isSelected()));
-        sellGEBox.addActionListener(e -> config.setSellOnGE(sellGEBox.isSelected()));
-
-        // Handle window closing
-        addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override
-            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
-                if (script != null) {
-                    script.setStarted(false);
-                }
-                dispose();
-            }
-        });
-
         // Add components to panel
-        mainPanel.add(makeSerumsBox);
         mainPanel.add(cleanHerbsBox);
-        mainPanel.add(tickManipBox);
-        mainPanel.add(sellGEBox);
+        mainPanel.add(makeSerumsBox);
         mainPanel.add(startButton);
 
         // Add panel to frame

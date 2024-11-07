@@ -7,7 +7,6 @@ public class SerumConfig {
     private static SerumConfig instance;
     
     private boolean makeSerums = true;
-    private boolean useTickManipulation = true;
     private boolean sellOnGE = false;
     private boolean cleanHerbs = true;
     
@@ -28,14 +27,6 @@ public class SerumConfig {
     
     public void setMakeSerums(boolean makeSerums) {
         this.makeSerums = makeSerums;
-    }
-    
-    public boolean shouldUseTickManipulation() {
-        return useTickManipulation;
-    }
-    
-    public void setUseTickManipulation(boolean useTickManipulation) {
-        this.useTickManipulation = useTickManipulation;
     }
     
     public boolean shouldSellOnGE() {

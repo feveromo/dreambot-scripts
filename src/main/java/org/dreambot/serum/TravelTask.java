@@ -1,7 +1,6 @@
 package org.dreambot.serum;
 
 import org.dreambot.api.methods.container.impl.Inventory;
-import org.dreambot.api.methods.container.impl.equipment.Equipment;
 import org.dreambot.api.methods.fairyring.FairyRings;
 import org.dreambot.api.methods.interactive.GameObjects;
 import org.dreambot.api.methods.interactive.Players;
@@ -15,11 +14,8 @@ import org.dreambot.api.wrappers.interactive.GameObject;
  * Handles all travel-related tasks including:
  * - Fairy ring teleports (GE <-> CKR)
  * - Walking to/from vine area
- * - Walking to bank
  */
 public class TravelTask extends Task {
-    private static final int DRAMEN_STAFF = 772;
-    
     // Areas
     private static final Area VINE_AREA = new Area(
         new Tile(2757, 3014),
@@ -30,52 +26,72 @@ public class TravelTask extends Task {
     private static final Area BANK_AREA = new Area(3164, 3485, 3167, 3489); // GE bank area
 
     private enum TravelState {
+        INITIAL_SETUP,
         WALK_TO_GE_RING,
         USE_RING_TO_CKR,
-        USE_RING_TO_GE,
         WALK_TO_VINES,
-        WALK_TO_BANK,
+        RETURN_TO_BANK,
         FINISHED
     }
 
-    private TravelState currentState = null;
+    private TravelState currentState = TravelState.INITIAL_SETUP;
+    private boolean hasInitialTeleported = false;
 
     @Override
     public boolean accept() {
-        // Accept if we need to move between areas
-        if (!hasRequirements()) return false;
-        
-        if (Inventory.isFull()) {
-            // Need to go to bank
-            return !BANK_AREA.contains(Players.getLocal());
-        } else {
-            // Need to go to vine area
-            return !VINE_AREA.contains(Players.getLocal());
+        // Accept if we need to move somewhere
+        if (BANK_AREA.contains(Players.getLocal())) {
+            return !hasInitialTeleported;  // Only accept at bank for initial teleport
         }
+
+        // If inventory is full, we need to return to bank
+        if (Inventory.isFull()) {
+            return true;
+        }
+
+        // Accept if we're not at vines and haven't done initial teleport
+        return !VINE_AREA.contains(Players.getLocal()) && !hasInitialTeleported;
     }
 
     @Override
     public int execute() {
-        if (currentState == null) {
-            currentState = getInitialState();
+        // If inventory is full, handle return to bank
+        if (Inventory.isFull()) {
+            if (CKR_FAIRY_RING_AREA.contains(Players.getLocal()) || VINE_AREA.contains(Players.getLocal())) {
+                log("Inventory full, teleporting to GE...");
+                if (useFairyRing("DKR")) {
+                    currentState = TravelState.RETURN_TO_BANK;
+                }
+                return 200;
+            }
+            
+            if (GE_FAIRY_RING_AREA.contains(Players.getLocal())) {
+                log("At GE fairy ring, walking to bank...");
+                if (walkToBank()) {
+                    currentState = TravelState.FINISHED;
+                }
+                return 200;
+            }
         }
 
+        // Handle initial setup and vine collection path
         switch (currentState) {
+            case INITIAL_SETUP:
+                if (BANK_AREA.contains(Players.getLocal())) {
+                    currentState = TravelState.WALK_TO_GE_RING;
+                }
+                break;
+
             case WALK_TO_GE_RING:
                 if (walkToGERing()) {
-                    currentState = Inventory.isFull() ? TravelState.USE_RING_TO_GE : TravelState.USE_RING_TO_CKR;
+                    currentState = TravelState.USE_RING_TO_CKR;
                 }
                 break;
 
             case USE_RING_TO_CKR:
-                if (useFairyRing("CKR")) {
+                if (!hasInitialTeleported && useFairyRing("CKR")) {
+                    hasInitialTeleported = true;
                     currentState = TravelState.WALK_TO_VINES;
-                }
-                break;
-
-            case USE_RING_TO_GE:
-                if (useFairyRing("DKR")) {
-                    currentState = TravelState.WALK_TO_BANK;
                 }
                 break;
 
@@ -85,7 +101,7 @@ public class TravelTask extends Task {
                 }
                 break;
 
-            case WALK_TO_BANK:
+            case RETURN_TO_BANK:
                 if (walkToBank()) {
                     currentState = TravelState.FINISHED;
                 }
@@ -95,63 +111,20 @@ public class TravelTask extends Task {
         return 200;
     }
 
-    private TravelState getInitialState() {
-        if (BANK_AREA.contains(Players.getLocal())) {
-            return TravelState.WALK_TO_GE_RING;
-        }
-        if (GE_FAIRY_RING_AREA.contains(Players.getLocal())) {
-            return Inventory.isFull() ? TravelState.USE_RING_TO_GE : TravelState.USE_RING_TO_CKR;
-        }
-        if (CKR_FAIRY_RING_AREA.contains(Players.getLocal())) {
-            return Inventory.isFull() ? TravelState.USE_RING_TO_GE : TravelState.WALK_TO_VINES;
-        }
-        if (VINE_AREA.contains(Players.getLocal()) && Inventory.isFull()) {
-            return TravelState.WALK_TO_GE_RING;
-        }
-        return TravelState.WALK_TO_GE_RING;
-    }
-
-    private boolean hasRequirements() {
-        return Inventory.contains(DRAMEN_STAFF) || Equipment.contains(DRAMEN_STAFF);
-    }
-
     private boolean walkToGERing() {
         log("Walking to GE fairy ring...");
-        Walking.walk(GE_FAIRY_RING_AREA.getCenter());
+        if (!Walking.walk(GE_FAIRY_RING_AREA.getCenter())) {
+            log("Failed to generate path to fairy ring!");
+            return false;
+        }
         return Sleep.sleepUntil(() -> GE_FAIRY_RING_AREA.contains(Players.getLocal()), 1000);
     }
 
     private boolean walkToVines() {
         log("Walking to vine area...");
         Tile destination = new Tile(2765, 3028);
-        
-        // If we're far from the destination
-        if (destination.distance() > 10) {
-            if (!Walking.shouldWalk()) return false;
-            
-            // Use regular walking but with better distance checks
-            if (!Walking.walk(destination)) {
-                log("Failed to walk to vine area!");
-                return false;
-            }
-        } else {
-            // If we're close, use regular walking
-            Walking.walk(destination);
-        }
-        
-        // Wait for movement to complete
-        Sleep.sleepUntil(() -> {
-            // Check if we're moving or have reached the area
-            return !Players.getLocal().isMoving() || VINE_AREA.contains(Players.getLocal());
-        }, 1000);
-        
-        // Add a small delay after movement stops
-        if (!VINE_AREA.contains(Players.getLocal())) {
-            sleep(300);
-            return false;
-        }
-        
-        return true;
+        Walking.walk(destination);
+        return Sleep.sleepUntil(() -> VINE_AREA.contains(Players.getLocal()), 1000);
     }
 
     private boolean walkToBank() {
@@ -191,15 +164,6 @@ public class TravelTask extends Task {
                     if (Players.getLocal().isAnimating()) {
                         Sleep.sleepUntil(() -> !Players.getLocal().isAnimating(), 2000);
                         sleep(600);
-                        
-                        // After teleport, force state change based on inventory
-                        if (code.equals("CKR")) {
-                            currentState = TravelState.WALK_TO_VINES;
-                            log("Successfully teleported to CKR, moving to vines next");
-                        } else {
-                            currentState = TravelState.WALK_TO_BANK;
-                            log("Successfully teleported to GE, moving to bank next");
-                        }
                         return true;
                     }
                 }

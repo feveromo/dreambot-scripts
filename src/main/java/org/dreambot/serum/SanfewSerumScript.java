@@ -39,7 +39,6 @@ public class SanfewSerumScript extends TaskScript {
             log("Starting script with configuration:");
             log("Make Serums: " + config.shouldMakeSerums());
             log("Clean Herbs: " + config.shouldCleanHerbs());
-            log("Use Tick Manipulation: " + config.shouldUseTickManipulation());
             log("Sell on GE: " + config.shouldSellOnGE());
 
             // Initialize tasks

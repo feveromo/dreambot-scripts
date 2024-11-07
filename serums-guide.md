@@ -24,20 +24,13 @@ this guide will walk an LLM through scripting a bot in DreamBot to automate the 
 
 ---
 
-### 3. Collect Snakeweed (Tick Manipulation)
+### 3. Collect Snakeweed (Regular Collection)
 - **Highlighting Vines**: (optional but helpful for DreamBot navigation)  
   - identify and highlight the vine objects for easier targeting
 
 - **Looped Collection Actions**:  
-  1. `use swamp tar on Guam leaf` to prepare for snakeweed collection  
-  2. immediately `click on vine` to attempt snakeweed collection  
-  3. if *bush shaking sound* occurs, move to the next vine; repeat the process  
-  4. **wait** for a fixed time (adjust based on response speed), or listen for sound cue, then proceed to the next vine  
-
-- **World-Hopping (optional, for efficiency)**:  
-  - after clearing all vines, `hop to another world` and repeat the snakeweed collection loop  
-  - repeat until inventory is full of snakeweed  
-
+  - immediately `click on vine` to attempt snakeweed collection  
+  - if herb found dialogue occurs, move to the next vine; repeat the process  
 ---
 
 ### 4. Clean Snakeweed & Bank Run
@@ -45,9 +38,8 @@ this guide will walk an LLM through scripting a bot in DreamBot to automate the 
   - if inventory is full of snakeweed, clean each piece for additional herblore XP  
 
 - **Banking**:  
-  - `teleport to Castle Wars` or use bank teleport to deposit items  
-  - store cleaned snakeweed and retrieve items for sandfew serum crafting  
-
+  - take ckr to dkr fairy ring to grand exchange and bank inventory
+  - retrieve items for sandfew serum crafting  
 ---
 
 ### 5. Craft Sandfew Serums
@@ -62,13 +54,7 @@ this guide will walk an LLM through scripting a bot in DreamBot to automate the 
 
 ---
 
-### 6. Sell Sandfew Serums (Optional - Profit Maximization)
-- **Using Grand Exchange (GE)**:  
-  - if banked serums, withdraw all and navigate to the GE  
-  - `list sandfew serums for sale`  
-  - recommended: set price slightly above default GE value to maximize profits  
 
----
 
 ### 7. Repeat Loop for XP & Profit
 - **Loop to Step 2**:  
