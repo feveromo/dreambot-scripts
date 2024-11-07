@@ -1,1 +1,10 @@
-C:\Users\cmd\Dev\db-scripts\demo\src\main\java\org\dreambot\BlastFurnaceScript.java
+C:\Users\cmd\Dev\db-scripts\db-template\src\main\java\org\dreambot\blastfurnace\BlastFurnaceScript.java
+C:\Users\cmd\Dev\db-scripts\db-template\src\main\java\org\dreambot\serum\BankingTask.java
+C:\Users\cmd\Dev\db-scripts\db-template\src\main\java\org\dreambot\serum\CleanHerbsTask.java
+C:\Users\cmd\Dev\db-scripts\db-template\src\main\java\org\dreambot\serum\CollectSnakeweedTask.java
+C:\Users\cmd\Dev\db-scripts\db-template\src\main\java\org\dreambot\serum\config\SerumConfig.java
+C:\Users\cmd\Dev\db-scripts\db-template\src\main\java\org\dreambot\serum\CraftSerumTask.java
+C:\Users\cmd\Dev\db-scripts\db-template\src\main\java\org\dreambot\serum\gui\SerumGUI.java
+C:\Users\cmd\Dev\db-scripts\db-template\src\main\java\org\dreambot\serum\SanfewSerumScript.java
+C:\Users\cmd\Dev\db-scripts\db-template\src\main\java\org\dreambot\serum\Task.java
+C:\Users\cmd\Dev\db-scripts\db-template\src\main\java\org\dreambot\serum\TravelTask.java

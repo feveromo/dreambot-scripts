@@ -1,4 +1,4 @@
-package org.dreambot;
+package org.dreambot.blastfurnace;
 
 import org.dreambot.api.methods.container.impl.Inventory;
 import org.dreambot.api.methods.container.impl.bank.Bank;
