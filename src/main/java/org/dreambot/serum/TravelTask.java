@@ -30,58 +30,67 @@ public class TravelTask extends Task {
         WALK_TO_GE_RING,
         USE_RING_TO_CKR,
         WALK_TO_VINES,
-        RETURN_TO_BANK,
+        USE_RING_TO_GE,
+        WALK_TO_BANK,
         FINISHED
     }
 
     private TravelState currentState = TravelState.INITIAL_SETUP;
-    private boolean hasInitialTeleported = false;
 
     @Override
     public boolean accept() {
-        // Accept if we need to move somewhere
-        if (BANK_AREA.contains(Players.getLocal())) {
-            return !hasInitialTeleported;  // Only accept at bank for initial teleport
+        // If we're at vines with empty inventory, don't accept
+        if (VINE_AREA.contains(Players.getLocal()) && !Inventory.isFull()) {
+            return false;
         }
 
-        // If inventory is full, we need to return to bank
-        if (Inventory.isFull()) {
+        // If inventory is full and we're not at bank, accept to handle return
+        if (Inventory.isFull() && !BANK_AREA.contains(Players.getLocal())) {
             return true;
         }
 
-        // Accept if we're not at vines and haven't done initial teleport
-        return !VINE_AREA.contains(Players.getLocal()) && !hasInitialTeleported;
+        // Accept if we're not at vines and inventory isn't full
+        return !VINE_AREA.contains(Players.getLocal()) && !Inventory.isFull();
     }
 
     @Override
     public int execute() {
-        // If inventory is full, handle return to bank
-        if (Inventory.isFull()) {
-            if (CKR_FAIRY_RING_AREA.contains(Players.getLocal()) || VINE_AREA.contains(Players.getLocal())) {
-                log("Inventory full, teleporting to GE...");
-                if (useFairyRing("DKR")) {
-                    currentState = TravelState.RETURN_TO_BANK;
-                }
-                return 200;
-            }
-            
-            if (GE_FAIRY_RING_AREA.contains(Players.getLocal())) {
-                log("At GE fairy ring, walking to bank...");
-                if (walkToBank()) {
+        // Debug logging
+        log("Current state: " + currentState);
+        log("Current position: " + Players.getLocal().getTile().toString());
+
+        // Handle initial setup based on current location
+        if (currentState == TravelState.INITIAL_SETUP) {
+            if (VINE_AREA.contains(Players.getLocal())) {
+                if (Inventory.isFull()) {
+                    currentState = TravelState.USE_RING_TO_GE;
+                } else {
                     currentState = TravelState.FINISHED;
                 }
-                return 200;
-            }
-        }
-
-        // Handle initial setup and vine collection path
-        switch (currentState) {
-            case INITIAL_SETUP:
-                if (BANK_AREA.contains(Players.getLocal())) {
+            } else if (CKR_FAIRY_RING_AREA.contains(Players.getLocal())) {
+                log("Starting at CKR fairy ring, walking to vines...");
+                currentState = TravelState.WALK_TO_VINES;
+                return 100;
+            } else if (GE_FAIRY_RING_AREA.contains(Players.getLocal())) {
+                currentState = TravelState.USE_RING_TO_CKR;
+            } else if (BANK_AREA.contains(Players.getLocal())) {
+                currentState = TravelState.WALK_TO_GE_RING;
+            } else {
+                // If we're near CKR area but not exactly in it
+                Tile playerTile = Players.getLocal().getTile();
+                if (playerTile.getX() >= 2780 && playerTile.getX() <= 2810 &&
+                    playerTile.getY() >= 2990 && playerTile.getY() <= 3010) {
+                    log("Near CKR area, walking to vines...");
+                    currentState = TravelState.WALK_TO_VINES;
+                } else {
                     currentState = TravelState.WALK_TO_GE_RING;
                 }
-                break;
+            }
+            return 100;
+        }
 
+        // Handle states
+        switch (currentState) {
             case WALK_TO_GE_RING:
                 if (walkToGERing()) {
                     currentState = TravelState.USE_RING_TO_CKR;
@@ -89,8 +98,7 @@ public class TravelTask extends Task {
                 break;
 
             case USE_RING_TO_CKR:
-                if (!hasInitialTeleported && useFairyRing("CKR")) {
-                    hasInitialTeleported = true;
+                if (useFairyRing("CKR")) {
                     currentState = TravelState.WALK_TO_VINES;
                 }
                 break;
@@ -101,7 +109,13 @@ public class TravelTask extends Task {
                 }
                 break;
 
-            case RETURN_TO_BANK:
+            case USE_RING_TO_GE:
+                if (useFairyRing("DKR")) {
+                    currentState = TravelState.WALK_TO_BANK;
+                }
+                break;
+
+            case WALK_TO_BANK:
                 if (walkToBank()) {
                     currentState = TravelState.FINISHED;
                 }
@@ -112,7 +126,6 @@ public class TravelTask extends Task {
     }
 
     private boolean walkToGERing() {
-        log("Walking to GE fairy ring...");
         if (!Walking.walk(GE_FAIRY_RING_AREA.getCenter())) {
             log("Failed to generate path to fairy ring!");
             return false;
@@ -122,8 +135,7 @@ public class TravelTask extends Task {
 
     private boolean walkToVines() {
         log("Walking to vine area...");
-        Tile destination = new Tile(2765, 3028);
-        Walking.walk(destination);
+        Walking.walk(new Tile(2765, 3028));
         return Sleep.sleepUntil(() -> VINE_AREA.contains(Players.getLocal()), 1000);
     }
 
