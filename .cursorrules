@@ -1,228 +1,125 @@
-## DreamBot Scripting Guidelines for Cursor AI
+# DreamBot Script Development Guidelines
 
-AI Persona:
-You are an experienced DreamBot script developer who:
-- Follows DreamBot's scripting guidelines and best practices
-- Creates efficient, maintainable, and well-documented scripts
-- Uses appropriate sleep delays and anti-ban measures
-- Implements proper error handling and safety checks
-- Follows Object-Oriented Programming principles
+## State Management Best Practices
+1. Keep states linear and simple (e.g., WALK -> USE -> COLLECT -> RETURN)
+2. Avoid state loops in accept() methods - check currentState == FINISHED
+3. Always have clear entry/exit conditions for each state
+4. Log state transitions for debugging
+5. Reset states properly after completion
+6. Use enums for clear state definitions
+7. Handle state transitions atomically
 
-Technology Stack:
-- Java Development Kit (JDK) 8+
-- Apache Maven for dependency management
-- DreamBot Client API
-- Common Libraries: Papaparse for CSV handling, lodash for utilities
+## Fairy Ring Interactions
+1. Check both location AND existence of rings
+2. Add delays between code inputs (200ms minimum)
+3. Wait for interface to fully open before entering codes
+4. Verify teleport completion before proceeding
+5. Use area checks to confirm successful teleports
+6. Handle animation completion after teleport
+7. Add proper error logging for ring detection
 
-Script Structure:
-1. All scripts must extend either AbstractScript or TaskScript
-2. Must include @ScriptManifest annotation with required fields:
-   - name: Script name shown in script manager
-   - description: Clear description of script functionality
-   - author: Developer name
-   - version: Current script version
-   - category: Appropriate Category enum value
-   - image: Optional image URL (imgur.com format)
+## Area Definitions
+1. Make areas slightly larger than needed
+2. Double-check coordinates with in-game positions
+3. Use center points for walking destinations
+4. Include object locations within areas
+5. Define separate areas for different functionalities
+6. Add buffer zones around interaction points
+7. Verify area containment before actions
 
-Script Development Rules:
-1. State Management:
-   - Use enums for script states
-   - Implement clear state transitions
-   - Handle edge cases and error states
+## Sleep Conditions
+1. Use Sleep.sleepUntil() with proper conditions
+2. Add timeouts to prevent infinite waits
+3. Include animation checks after actions
+4. Add small delays after successful actions
+5. Use randomized delays between actions
+6. Verify completion conditions
+7. Add proper timeouts for interface interactions
 
-2. Loop Structure:
-   - onLoop() method must return sleep time in milliseconds
-   - Avoid infinite loops
-   - Use Sleep.sleepUntil() for conditional waiting
-   - Implement appropriate sleep times between actions
+## Walking Logic
+1. Check Walking.walk() return value
+2. Add Sleep conditions after walking calls
+3. Verify arrival with area contains checks
+4. Use proper distance checks before interactions
+5. Handle walking failures gracefully
+6. Add position logging for debugging
+7. Use proper tile selection for destinations
 
-3. API Interactions:
-   - Always null check entities before interaction
-   - Use closest() methods with appropriate filters
-   - Implement proper walking and pathfinding logic
-   - Handle bank interactions safely
-   - Use proper inventory management
+## Inventory Management
+1. Check inventory state at start of tasks
+2. Track item counts for verification
+3. Add proper full/empty checks
+4. Use constants for all item IDs
+5. Handle inventory state changes
+6. Verify item existence before interactions
+7. Track collection progress
 
-4. Bank Operations:
-   - Always check Bank.isOpen() before operations
-   - Use Bank.open() before attempting transactions
-   - Implement proper withdraw/deposit logic
-   - Close bank when finished
+## Task Design
+1. Keep tasks focused on single responsibility
+2. Add proper accept() conditions
+3. Include state reset logic
+4. Add proper logging in execute()
+5. Pass script instance for statistics
+6. Handle task transitions properly
+7. Add proper documentation
 
-5. Entity Interaction:
-   - Use GameObjects for static objects
-   - Use NPCs for mobile entities
-   - Implement proper distance checking
-   - Handle interaction animations and delays
+## Interface Handling
+1. Verify interface state before interactions
+2. Add proper sleep conditions for interface opening
+3. Handle interface closing properly
+4. Add timeouts for interface operations
+5. Verify successful interactions
+6. Handle dialogue properly
+7. Add proper delays between inputs
 
-6. Mouse/Keyboard Input:
-   - Use Mouse class for mouse movement
-   - Implement human-like delays
-   - Use Keyboard class for key inputs
-   - Avoid direct coordinate clicking
+## Statistics Tracking
+1. Track runtime properly
+2. Calculate per hour rates correctly
+3. Update statistics atomically
+4. Add proper paint display
+5. Track state information
+6. Log important events
+7. Handle counter updates properly
 
-7. Anti-Ban Measures:
-   - Implement random delays
-   - Use camera rotation
-   - Add occasional breaks
-   - Vary interaction patterns
+## Error Recovery
+1. Add detailed error logging
+2. Include position information in logs
+3. Add retry logic for critical actions
+4. Reset states on failures
+5. Handle timeout conditions
+6. Add fallback logic
+7. Implement proper error states
 
-Maven Configuration:
-```xml
-<repositories>
-    <repository>
-        <id>dreambot</id>
-        <name>dreambot</name>
-        <url>https://downloads.dreambot.org/maven/</url>
-    </repository>
-</repositories>
+## Script Structure
+1. Use proper package organization
+2. Add thorough documentation
+3. Use consistent naming conventions
+4. Implement proper configuration
+5. Add GUI when needed
+6. Handle script lifecycle properly
+7. Follow DreamBot best practices
 
-<dependencies>
-    <dependency>
-        <groupId>org.dreambot</groupId>
-        <artifactId>client</artifactId>
-        <version>3.0.0</version>
-        <scope>provided</scope>
-    </dependency>
-</dependencies>
-```
+## Common Pitfalls to Avoid
+1. State loops in accept() methods
+2. Missing sleep conditions
+3. Incorrect area definitions
+4. Missing existence checks
+5. Improper state transitions
+6. Inadequate error handling
+7. Poor documentation
 
-Common Code Patterns:
+## Debugging Essentials
+1. Add detailed logging
+2. Include position information
+3. Log all state transitions
+4. Track inventory changes
+5. Monitor interaction results
+6. Add timing information
+7. Track success/failure rates
 
-1. Walking to Location:
-```java
-if (!Players.getLocal().isMoving()) {
-    Walking.walk(destination);
-    Sleep.sleepUntil(() -> Players.getLocal().isMoving(), 2000);
-}
-```
-
-2. Bank Interaction:
-```java
-if (Bank.open()) {
-    if (Sleep.sleepUntil(() -> Bank.isOpen(), 3000)) {
-        // Perform bank operations
-        Sleep.sleepUntil(() -> condition, timeout);
-    }
-}
-```
-
-3. Entity Interaction:
-```java
-GameObject object = GameObjects.closest(filter);
-if (object != null && object.interact(action)) {
-    Sleep.sleepUntil(() -> Players.getLocal().isAnimating(), 2000);
-}
-```
-
-4. Inventory Management:
-```java
-if (Inventory.isFull()) {
-    handleFullInventory();
-} else if (Inventory.isEmpty()) {
-    handleEmptyInventory();
-}
-```
-
-State Pattern Implementation:
-```java
-private enum State {
-    IDLE,
-    WALKING,
-    INTERACTING,
-    BANKING
-}
-
-private State getState() {
-    if (Bank.isOpen()) {
-        return State.BANKING;
-    }
-    if (Players.getLocal().isMoving()) {
-        return State.WALKING;
-    }
-    if (Players.getLocal().isAnimating()) {
-        return State.INTERACTING;
-    }
-    return State.IDLE;
-}
-
-@Override
-public int onLoop() {
-    switch (getState()) {
-        case BANKING:
-            // Handle banking
-            break;
-        case WALKING:
-            // Handle walking
-            break;
-        case INTERACTING:
-            // Handle interaction
-            break;
-        case IDLE:
-            // Find next action
-            break;
-    }
-    return Calculations.random(500, 1000);
-}
-```
-
-Error Handling:
-1. Always wrap interactions in try-catch blocks
-2. Use Logger.log() for debugging and status updates
-3. Implement fallback logic for failed interactions
-4. Handle disconnections and game state changes
-
-Best Practices:
-1. Use static methods from API classes (Players, NPCs, etc.)
-2. Implement proper sleep delays between actions
-3. Use filters for precise entity targeting
-4. Handle all possible error states
-5. Implement anti-ban measures
-6. Use proper logging for debugging
-7. Follow DreamBot's SDN guidelines for public scripts
-
-SDN Guidelines:
-1. Scripts must meet quality standards:
-   - Dynamic start position
-   - Automatic restocking
-   - Skill progression (premium)
-   - Item progression (premium)
-2. No sending of identifiable information
-3. Follow review request guidelines
-4. Proper security measures
-
-Documentation Requirements:
-1. Include clear class-level documentation
-2. Document complex logic and algorithms
-3. Use appropriate method naming
-4. Include usage instructions
-5. Document state transitions
-
-Common API Usage:
-1. Entity Finding:
-   - GameObjects.closest(filter) for static objects
-   - NPCs.closest(filter) for NPCs
-   - Players.getLocal() for local player
-   - GroundItems.closest(filter) for items
-
-2. Inventory Management:
-   - Inventory.contains(id/name)
-   - Inventory.count(id/name)
-   - Inventory.isFull()
-   - Inventory.isEmpty()
-
-3. Walking:
-   - Walking.walk(tile/area)
-   - Walking.shouldWalk()
-   - Map.isTileOnMap(tile)
-
-4. Banking:
-   - Bank.open()
-   - Bank.close()
-   - Bank.withdraw(id/name, amount)
-   - Bank.deposit(id/name, amount)
-
-5. Sleep Utilities:
-   - Sleep.sleep(min, max)
-   - Sleep.sleepUntil(() -> condition, timeout)
-   - Calculations.random(min, max)
+Remember: When stuck:
+1. Add more logging
+2. Simplify state logic
+3. Verify area definitions
+4. Check sleep conditions
+5. Monitor state transitions 

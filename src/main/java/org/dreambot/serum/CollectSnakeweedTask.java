@@ -2,6 +2,7 @@ package org.dreambot.serum;
 
 import org.dreambot.api.methods.container.impl.Inventory;
 import org.dreambot.api.methods.dialogues.Dialogues;
+import org.dreambot.api.methods.input.Camera;
 import org.dreambot.api.methods.interactive.GameObjects;
 import org.dreambot.api.methods.interactive.Players;
 import org.dreambot.api.methods.map.Area;
@@ -11,88 +12,93 @@ import org.dreambot.api.utilities.Sleep;
 import org.dreambot.api.wrappers.interactive.GameObject;
 
 /**
- * Handles only the collection of snakeweed.
+ * CollectSnakeweedTask.java
+ * Purpose: Handles snakeweed collection from marshy vines in Karamja
+ * Key functionality:
+ * - Locates and interacts with marshy jungle vines
+ * - Manages dialogue interactions during collection
+ * - Tracks inventory status and collection progress
+ * - Updates script statistics
+ * 
+ * Implementation notes:
+ * 1. Vine detection requires both ID and name checks
+ * 2. Interaction cooldown prevents spam clicking
+ * 3. Camera rotation helps when vines aren't visible
+ * 4. Distance checks ensure proper pathing
  */
 public class CollectSnakeweedTask extends Task {
-    private static final int VINE_ID = 2575;
-    private static final int SNAKEWEED_UNCLEANED = 3051;
+    private static final int VINE_ID = 21941;
     private static final int GRIMY_SNAKEWEED = 1525;
     
-    // Area that covers the vine spawns
     private static final Area VINE_AREA = new Area(
         new Tile(2757, 3014),
         new Tile(2776, 3044)
     );
 
-    private boolean isCollecting = false;
-    private long lastVineClick = 0;
-    private GameObject currentVine = null;
     private int previousInventoryCount = 0;
+    private long lastInteractionTime = 0;
+    private static final int INTERACTION_COOLDOWN = 1200;
+    
+    // Reference to main script for tracking
+    private final SanfewSerumScript script;
+
+    public CollectSnakeweedTask(SanfewSerumScript script) {
+        this.script = script;
+    }
 
     @Override
     public boolean accept() {
-        // Check if we're in the correct area and have space for snakeweed
         return !Inventory.isFull() && VINE_AREA.contains(Players.getLocal());
     }
 
     @Override
     public int execute() {
-        // Check if inventory is full of grimy snakeweed
-        int currentCount = Inventory.count(GRIMY_SNAKEWEED);
-        if (currentCount >= 28) {
-            log("Inventory full of grimy snakeweed (" + currentCount + "), proceeding to clean...");
-            return 200;
-        }
-
-        // Track actual collection by monitoring inventory changes
-        if (currentCount > previousInventoryCount) {
-            log("Collected snakeweed: " + currentCount);
-            previousInventoryCount = currentCount;
-            isCollecting = false;
-            lastVineClick = 0;
-            currentVine = null;
-            return 200;
-        }
-
-        // If we're waiting for dialogue, just wait
-        if (isCollecting) {
-            if (Dialogues.canContinue()) {
-                return 100;
-            }
+        script.updateState("Collecting Snakeweed");
+        
+        // Handle dialogue first if it exists
+        if (Dialogues.canContinue()) {
+            Dialogues.continueDialogue();
             return 100;
         }
 
-        // If we're not collecting, find a new vine
-        if (currentVine == null) {
-            currentVine = GameObjects.closest(obj -> 
-                obj != null &&
-                obj.getID() == VINE_ID && 
-                VINE_AREA.contains(obj)
-            );
+        // Check if we collected something
+        int currentCount = Inventory.count(GRIMY_SNAKEWEED);
+        if (currentCount > previousInventoryCount) {
+            previousInventoryCount = currentCount;
+            script.incrementHerbsCollected(); // Update counter through script reference
+            sleep(300);
+            return 100;
         }
-        
-        if (currentVine != null && currentVine.exists()) {
-            if (currentVine.distance() > 5) {
-                log("Walking closer to vine at " + currentVine.getTile().toString());
-                Walking.walk(currentVine);
-                Sleep.sleepUntil(() -> currentVine.distance() < 5, 1000);
-                return 200;
+
+        // Respect click cooldown
+        if (System.currentTimeMillis() - lastInteractionTime < INTERACTION_COOLDOWN) {
+            return 100;
+        }
+
+        // Find and interact with nearest vine
+        GameObject vine = GameObjects.closest(obj -> 
+            obj != null && 
+            obj.exists() &&
+            VINE_AREA.contains(obj) &&
+            (obj.getName().equals("Marshy jungle vine") || obj.getID() == VINE_ID) &&
+            obj.hasAction("Search")
+        );
+
+        if (vine != null && vine.exists()) {
+            if (vine.distance() > 4) {
+                Walking.walk(vine);
+                return 600;
             }
 
-            // Prevent spam clicking
-            if (System.currentTimeMillis() - lastVineClick < 1200) {
-                return 100;
-            }
-
-            // Regular collection
-            if (!Players.getLocal().isAnimating() && currentVine.interact("Search")) {
-                lastVineClick = System.currentTimeMillis();
-                isCollecting = true;
+            if (!Players.getLocal().isAnimating() && vine.interact("Search")) {
+                lastInteractionTime = System.currentTimeMillis();
                 Sleep.sleepUntil(() -> Dialogues.canContinue(), 2000);
             }
         } else {
-            log("No vines found in area! Position: " + Players.getLocal().getTile().toString());
+            // If no vine found, rotate camera
+            Camera.rotateToTile(new Tile(2765, 3028, 0));
         }
+
         return 200;
     }
 } 

@@ -3,7 +3,22 @@ package org.dreambot.serum;
 import org.dreambot.api.methods.container.impl.Inventory;
 import org.dreambot.api.utilities.Sleep;
 
+/**
+ * CraftSerumTask.java
+ * Purpose: Handles creation of Sanfew serums from components
+ * Key functionality:
+ * - Combines ingredients in correct order
+ * - Manages inventory state
+ * - Controls action timing
+ * 
+ * Implementation notes:
+ * 1. Requires all components before accepting
+ * 2. Uses proper delays between actions
+ * 3. Verifies successful creation
+ * 4. Returns longer delay on failure
+ */
 public class CraftSerumTask extends Task {
+    // Item identifiers for serum components
     private static final int SUPER_RESTORE_4 = 3024;
     private static final int CRUSHED_UNICORN_HORN = 235;
     private static final int NAIL_BEAST_NAILS = 4198;
