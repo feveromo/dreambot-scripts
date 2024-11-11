@@ -46,6 +46,7 @@ public class SnakeweedCollector extends AbstractScript implements PaintListener 
     // Game object and item identifiers
     private static final int VINE_ID = 21941;          // Marshy jungle vine ID
     private static final int GRIMY_SNAKEWEED = 1525;   // Collected herb ID
+    private static final int PICKING_ANIMATION = 2094; // Picking animation ID
     
     // Critical: Area boundaries must fully contain relevant objects
     private static final Area VINE_AREA = new Area(2757, 3014, 2776, 3044);
@@ -59,6 +60,7 @@ public class SnakeweedCollector extends AbstractScript implements PaintListener 
     private long startTime;
     private long lastInteractionTime = 0;
     private static final int INTERACTION_COOLDOWN = 1200; // Minimum ms between interactions
+    private int previousInventoryCount = 0;
 
     /**
      * States represent each stage of the collection process
@@ -173,15 +175,28 @@ public class SnakeweedCollector extends AbstractScript implements PaintListener 
     /**
      * Handles herb collection from vines
      * Includes dialogue handling and interaction timing
+     * Tracks successful collections through inventory changes
      * 
      * @return Sleep duration in milliseconds
      */
     private int collectHerbs() {
+        // Check if we collected something by comparing counts
+        int currentCount = Inventory.count(GRIMY_SNAKEWEED);
+        if (currentCount > previousInventoryCount) {
+            herbsCollected++;
+            log("Herb collected! Total: " + herbsCollected);
+            previousInventoryCount = currentCount;
+            sleep(300);
+            return 100;
+        }
+
+        // Handle dialogue
         if (Dialogues.canContinue()) {
             Dialogues.continueDialogue();
             return 100;
         }
 
+        // Respect interaction cooldown
         if (System.currentTimeMillis() - lastInteractionTime < INTERACTION_COOLDOWN) {
             return 100;
         }
@@ -203,7 +218,6 @@ public class SnakeweedCollector extends AbstractScript implements PaintListener 
             if (!Players.getLocal().isAnimating() && vine.interact("Search")) {
                 lastInteractionTime = System.currentTimeMillis();
                 Sleep.sleepUntil(() -> Dialogues.canContinue(), 2000);
-                herbsCollected++;
             }
         } else {
             Camera.rotateToTile(new Tile(2765, 3028, 0));
