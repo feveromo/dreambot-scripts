@@ -1,6 +1,9 @@
 org\dreambot\blastfurnace\BlastFurnaceScript$1.class
 org\dreambot\collector\SnakeweedCollector.class
+org\dreambot\blastfurnace\AdamantBarSmelter$1.class
 org\dreambot\collector\SnakeweedCollector$State.class
+org\dreambot\blastfurnace\AdamantBarSmelter$State.class
 org\dreambot\blastfurnace\BlastFurnaceScript.class
 org\dreambot\collector\SnakeweedCollector$1.class
+org\dreambot\blastfurnace\AdamantBarSmelter.class
 org\dreambot\blastfurnace\BlastFurnaceScript$State.class

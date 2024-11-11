@@ -1,11 +1,13 @@
 package org.dreambot.collector;
 
+import org.dreambot.api.methods.combat.Combat;
 import org.dreambot.api.methods.container.impl.Inventory;
 import org.dreambot.api.methods.container.impl.bank.Bank;
 import org.dreambot.api.methods.dialogues.Dialogues;
 import org.dreambot.api.methods.fairyring.FairyRings;
 import org.dreambot.api.methods.input.Camera;
 import org.dreambot.api.methods.interactive.GameObjects;
+import org.dreambot.api.methods.interactive.NPCs;
 import org.dreambot.api.methods.interactive.Players;
 import org.dreambot.api.methods.map.Area;
 import org.dreambot.api.methods.map.Tile;
@@ -38,7 +40,7 @@ import java.awt.Graphics;
 @ScriptManifest(
     name = "Snakeweed Collector",
     description = "Collects snakeweed using fairy rings",
-    author = "Your Name",
+    author = "fever",
     version = 1.0,
     category = Category.MONEYMAKING
 )
@@ -62,6 +64,11 @@ public class SnakeweedCollector extends AbstractScript implements PaintListener 
     private static final int INTERACTION_COOLDOWN = 1200; // Minimum ms between interactions
     private int previousInventoryCount = 0;
 
+    // Add these constants near the top with other constants
+    private static final int TRIBESMAN_ID = 530;
+    private static final int[] ANTIPOISON_IDS = {2446, 2448, 2450, 2452}; // All antipoison potion variants
+    private static final int[] FOOD_IDS = {379, 385, 373}; // Example: Lobster, Shark, Swordfish
+
     /**
      * States represent each stage of the collection process
      * Must progress linearly through states to maintain script flow
@@ -74,7 +81,8 @@ public class SnakeweedCollector extends AbstractScript implements PaintListener 
         RETURN_TO_CKR,        // Walking back to CKR fairy ring
         USE_CKR_RING,         // Using ring to return to GE
         WALK_TO_BANK,         // Walking to GE bank
-        BANKING              // Depositing collected herbs
+        BANKING,              // Depositing collected herbs
+        HANDLE_COMBAT,        // New state for combat situations
     }
 
     /**
@@ -93,6 +101,11 @@ public class SnakeweedCollector extends AbstractScript implements PaintListener 
      */
     @Override
     public int onLoop() {
+        // Add these checks at the start of onLoop
+        if (Combat.isPoisoned() || isInCombat()) {
+            currentState = State.HANDLE_COMBAT;
+        }
+
         switch (currentState) {
             case WALK_TO_GE_RING:
                 if (!GE_FAIRY_RING_AREA.contains(Players.getLocal())) {
@@ -165,8 +178,16 @@ public class SnakeweedCollector extends AbstractScript implements PaintListener 
 
             case BANKING:
                 if (handleBanking()) {
+                    // Only proceed if we're healthy
+                    if (needsHealing() || isPoisoned()) {
+                        return 600; // Stay in banking state
+                    }
                     currentState = State.WALK_TO_GE_RING;
                 }
+                return 600;
+
+            case HANDLE_COMBAT:
+                handleCombatSituation();
                 return 600;
         }
         return 600;
@@ -239,10 +260,43 @@ public class SnakeweedCollector extends AbstractScript implements PaintListener 
             return false;
         }
 
-        if (Bank.depositAll(GRIMY_SNAKEWEED)) {
-            Sleep.sleepUntil(() -> !Inventory.contains(GRIMY_SNAKEWEED), 2000);
-            Bank.close();
-            return true;
+        // Handle poison first
+        if (isPoisoned()) {
+            for (int potionId : ANTIPOISON_IDS) {
+                if (Bank.contains(potionId)) {
+                    Bank.withdraw(potionId, 1);
+                    Sleep.sleepUntil(() -> Inventory.contains(potionId), 2000);
+                    if (Inventory.contains(potionId)) {
+                        Inventory.interact(potionId, "Drink");
+                        Sleep.sleepUntil(() -> !isPoisoned(), 2000);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Handle healing if needed
+        if (needsHealing()) {
+            for (int foodId : FOOD_IDS) {
+                if (Bank.contains(foodId)) {
+                    Bank.withdraw(foodId, 5);
+                    Sleep.sleepUntil(() -> Inventory.contains(foodId), 2000);
+                    while (needsHealing() && Inventory.contains(foodId)) {
+                        Inventory.interact(foodId, "Eat");
+                        sleep(600);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Only deposit snakeweed if we're healthy
+        if (!isPoisoned() && !needsHealing()) {
+            if (Bank.depositAll(GRIMY_SNAKEWEED)) {
+                Sleep.sleepUntil(() -> !Inventory.contains(GRIMY_SNAKEWEED), 2000);
+                Bank.close();
+                return true;
+            }
         }
 
         return false;
@@ -335,5 +389,53 @@ public class SnakeweedCollector extends AbstractScript implements PaintListener 
     private int getPerHour(int value) {
         double timeRan = (System.currentTimeMillis() - startTime) / 3600000.0;
         return (int) (value / timeRan);
+    }
+
+    // Add these helper methods
+    private boolean isInCombat() {
+        return Players.getLocal().isInCombat() || 
+               Players.getLocal().getInteractingCharacter() != null ||
+               NPCs.closest(npc -> npc != null && 
+                                 npc.getID() == TRIBESMAN_ID && 
+                                 npc.isInteracting(Players.getLocal())) != null;
+    }
+
+    private boolean isPoisoned() {
+        return Combat.isPoisoned();
+    }
+
+    private boolean needsHealing() {
+        return Players.getLocal().getHealthPercent() < 50;
+    }
+
+    // Add this new method
+    private void handleCombatSituation() {
+        log("Handling combat/poison situation!");
+        
+        if (isInCombat()) {
+            // Run away if not already running
+            if (!Walking.isRunEnabled() && Walking.getRunEnergy() > 20) {
+                Walking.toggleRun();
+            }
+            
+            // Run to nearest fairy ring
+            GameObject nearestRing = GameObjects.closest("Fairy ring");
+            if (nearestRing != null) {
+                Walking.walk(nearestRing);
+            } else {
+                Walking.walk(CKR_FAIRY_RING_AREA.getCenter());
+            }
+            
+            return;
+        }
+        
+        // If we're out of combat but need banking, head to bank
+        if (!BANK_AREA.contains(Players.getLocal())) {
+            if (CKR_FAIRY_RING_AREA.contains(Players.getLocal())) {
+                currentState = State.USE_CKR_RING;
+            } else if (GE_FAIRY_RING_AREA.contains(Players.getLocal())) {
+                currentState = State.WALK_TO_BANK;
+            }
+        }
     }
 } 

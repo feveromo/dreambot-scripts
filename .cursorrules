@@ -1,13 +1,31 @@
 # DreamBot Script Development Guidelines
 
+## Script Architecture Preference
+1. Prefer node-based design over state-based architecture
+2. Each node should handle a single responsibility
+3. Implement validate() and execute() methods clearly
+4. Return appropriate sleep times from execute()
+5. Use proper node priority handling
+6. Chain nodes logically
+7. Handle node transitions cleanly
+
+## Node-Based Best Practices
+1. Keep validation logic fast and efficient
+2. Handle all possible execution outcomes
+3. Implement proper error recovery
+4. Consider dynamic priorities
+5. Account for script state in validation
+6. Handle emergency situations
+7. Balance competing nodes
+
 ## State Management Best Practices
-1. Keep states linear and simple (e.g., WALK -> USE -> COLLECT -> RETURN)
-2. Avoid state loops in accept() methods - check currentState == FINISHED
-3. Always have clear entry/exit conditions for each state
-4. Log state transitions for debugging
-5. Reset states properly after completion
-6. Use enums for clear state definitions
-7. Handle state transitions atomically
+1. If using states, keep them linear and simple
+2. Consider converting state-based logic to nodes
+3. Always have clear entry/exit conditions
+4. Log state/node transitions for debugging
+5. Reset states/nodes properly after completion
+6. Use enums for clear definitions
+7. Handle transitions atomically
 
 ## Fairy Ring Interactions
 1. Check both location AND existence of rings
