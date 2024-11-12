@@ -36,20 +36,20 @@ import java.awt.Graphics;
  * 
  * Requirements:
  * - Ice gloves equipped
- * - Coal bag in bank
+ * - Coal bag in bank or inventory
  * - Stamina potions (optional)
  * 
  * Process flow:
  * 1. Fill coal bag at bank
  * 2. Withdraw iron ore
- * 3. Deposit both at conveyor
+ * 3. Deposit iron ore, empty coal bag, deposit coal
  * 4. Collect bars from dispenser
  * 5. Bank bars and repeat
  */
 @ScriptManifest(
-    name = "DreamBot Steel Bar Smelter", 
+    name = "Blast Furnace Steel Bar Smelter", 
     description = "Efficient steel bar production at Blast Furnace", 
-    author = "DreamBot",
+    author = "fever",
     version = 1.0, 
     category = Category.SMITHING
 )
@@ -75,8 +75,9 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
     
     // Blast Furnace locations
     private static final Tile CONVEYOR_BELT_TILE = new Tile(1942, 4967, 0);
-    private static final Tile BAR_DISPENSER_TILE = new Tile(1939, 4963, 0);
+    private static final Tile BAR_DISPENSER_TILE = new Tile(1940, 4964, 0);
     private static final Area BLAST_FURNACE_AREA = new Area(1934, 4958, 1954, 4974, 0);
+    private static final Tile BANK_CHEST_TILE = new Tile(1948, 4957, 0);
 
     // Performance tracking
     private long startTime;
@@ -157,7 +158,14 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
             return 600;
         }
 
-        // Check stamina while bank is open
+        // First priority: deposit completed bars
+        if (Inventory.contains(STEEL_BAR_ID)) {
+            Logger.log("Depositing steel bars...");
+            Bank.depositAll(STEEL_BAR_ID);
+            return 600;
+        }
+
+        // Check stamina after depositing bars
         if (Walking.getRunEnergy() <= RUN_ENERGY_THRESHOLD) {
             Logger.log("Run energy low (" + Walking.getRunEnergy() + "%), checking for stamina potion...");
             
@@ -205,13 +213,6 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
         Logger.log("- Has iron ore: " + Inventory.contains(IRON_ORE_ID));
         Logger.log("- Coal bag full: " + coalBagFull);
         Logger.log("- Empty slots: " + Inventory.getEmptySlots());
-
-        // First priority: deposit completed bars
-        if (Inventory.contains(STEEL_BAR_ID)) {
-            Logger.log("Depositing steel bars...");
-            Bank.depositAll(STEEL_BAR_ID);
-            return 600;
-        }
 
         // Make sure we have coal bag
         if (!Inventory.contains(COAL_BAG_ID)) {
@@ -263,11 +264,11 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
         
         // First deposit iron ore
         if (Inventory.contains(IRON_ORE_ID)) {
-            // Give 10 seconds to reach conveyor from bank
+            // Increased from 5000 to 8000 (8 seconds)
             long startTime = System.currentTimeMillis();
-            boolean hasLoggedDeposit = false; // Track if we've logged deposit attempt
+            boolean hasLoggedDeposit = false;
             
-            while (System.currentTimeMillis() - startTime < 10000) { // 10 second timeout
+            while (System.currentTimeMillis() - startTime < 8000) { // Increased timeout
                 GameObject conveyor = GameObjects.closest("Conveyor belt");
                 if (conveyor != null && conveyor.canReach()) {
                     if (!hasLoggedDeposit) {
@@ -291,9 +292,9 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
                 }
             }
 
-            // If we still have iron ore after 10 seconds, go back to bank and retry
+            // Update message to match new timeout
             if (Inventory.contains(IRON_ORE_ID)) {
-                Logger.log("Failed to reach/deposit at conveyor within 10 seconds, returning to bank");
+                Logger.log("Failed to reach/deposit at conveyor within 8 seconds, returning to bank");
                 state = State.WALKING_TO_BANK;
                 return 600;
             }
@@ -310,11 +311,29 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
                     GameObject conveyor = GameObjects.closest("Conveyor belt");
                     if (conveyor != null && conveyor.canReach()) {
                         if (conveyor.interact("Put-ore-on")) {
-                            if (Sleep.sleepUntil(() -> !Inventory.contains(COAL_ID), 2000)) {
+                            // Wait longer for coal deposit and animation to complete
+                            if (Sleep.sleepUntil(() -> !Inventory.contains(COAL_ID), 3000)) {
                                 Logger.log("Coal deposited successfully");
                                 coalBagFull = false;
-                                state = State.WALKING_TO_COLLECTOR;
+                                
+                                // Add a small delay after deposit before state transition
+                                Sleep.sleep(600);
+                                
+                                // Now check for dispenser
+                                GameObject dispenser = GameObjects.closest("Bar dispenser");
+                                if (dispenser != null && dispenser.canReach()) {
+                                    if (dispenser.interact("Take")) {
+                                        state = State.COLLECTING_BARS;
+                                        return 100;
+                                    }
+                                }
+                                
+                                state = State.COLLECTING_BARS;
+                                Walking.walk(BAR_DISPENSER_TILE);
                                 return 100;
+                            } else {
+                                Logger.log("Failed to deposit coal, retrying...");
+                                return 600;
                             }
                         }
                     }
@@ -332,7 +351,10 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
      * @return Sleep duration in milliseconds
      */
     private int handleBarCollection() {
-        Logger.log("Current state: COLLECTING_BARS");
+        // Only log once when entering state
+        if (state != State.COLLECTING_BARS) {
+            Logger.log("Current state: COLLECTING_BARS");
+        }
         
         // First check if we have any bars in inventory - if so, go bank them
         if (Inventory.contains(STEEL_BAR_ID) || Inventory.contains(IRON_BAR_ID)) {
@@ -344,21 +366,24 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
         }
 
         GameObject dispenser = GameObjects.closest("Bar dispenser");
-        if (dispenser != null && dispenser.interact("Take")) {
+        // Add distance check to start walking if too far
+        if (dispenser == null || !dispenser.canReach()) {
+            Walking.walk(BAR_DISPENSER_TILE);
+            return 100;
+        }
+
+        if (dispenser.interact("Take")) {
             Logger.log("Interacting with bar dispenser...");
             
-            // Wait for chat interface
-            if (Sleep.sleepUntil(() -> Dialogues.inDialogue(), 5000)) {
+            if (Sleep.sleepUntil(() -> Dialogues.inDialogue(), 2000)) {
                 Logger.log("Dialogue opened for bar collection");
                 
-                // Press 1 to select "All"
                 Keyboard.type("1");
                 Logger.log("Pressed 1 to take all bars");
                 
-                // Wait for bars to appear in inventory
                 Sleep.sleepUntil(() -> 
                     Inventory.contains(STEEL_BAR_ID) || 
-                    Inventory.contains(IRON_BAR_ID), 5000);
+                    Inventory.contains(IRON_BAR_ID), 2000);
                 
                 if (Inventory.contains(STEEL_BAR_ID) || Inventory.contains(IRON_BAR_ID)) {
                     Logger.log("Successfully collected bars: " + 
@@ -367,14 +392,10 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
                             Inventory.count(STEEL_BAR_ID) : 
                             Inventory.count(IRON_BAR_ID)) + ")");
                     state = State.WALKING_TO_BANK;
-                } else {
-                    Logger.log("Failed to collect bars, retrying...");
                 }
-            } else {
-                Logger.log("No dialogue appeared, retrying...");
             }
         }
-        return 600;
+        return 100;
     }
 
     /**

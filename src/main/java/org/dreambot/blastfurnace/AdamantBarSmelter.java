@@ -221,18 +221,32 @@ public class AdamantBarSmelter extends AbstractScript implements PaintListener {
             Sleep.sleepUntil(() -> Inventory.contains(COAL_ID), 1200);
             if (Inventory.contains(COAL_ID)) {
                 conveyor.interact("Put-ore-on");
-                Sleep.sleepUntil(() -> !Inventory.contains(COAL_ID), 2000);
-                coalBagFull = false;
-                
-                // If we need second coal load, go back to bank
-                if (needSecondCoal) {
-                    needSecondCoal = false;
-                    isCoalCycle = false;
-                    state = State.WALKING_TO_BANK;
-                } else {
+                if (Sleep.sleepUntil(() -> !Inventory.contains(COAL_ID), 2000)) {
+                    Logger.log("Coal deposited successfully");
+                    coalBagFull = false;
+                    
+                    // If we need second coal load, go back to bank
+                    if (needSecondCoal) {
+                        needSecondCoal = false;
+                        isCoalCycle = false;
+                        state = State.WALKING_TO_BANK;
+                        return 100;
+                    }
+                    
+                    // Otherwise try to immediately collect bars
+                    GameObject dispenser = GameObjects.closest("Bar dispenser");
+                    if (dispenser != null && dispenser.canReach()) {
+                        if (dispenser.interact("Take")) {
+                            state = State.COLLECTING_BARS;
+                            return 100;
+                        }
+                    }
+                    
+                    // If we couldn't interact, walk to collector
                     state = State.WALKING_TO_COLLECTOR;
+                    Walking.walk(BAR_DISPENSER_TILE);
+                    return 100;
                 }
-                return 100;
             }
         }
 

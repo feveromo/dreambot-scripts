@@ -4,14 +4,14 @@ My personal development branch containing OSRS automation scripts built with Dre
 
 ## Current Scripts:
 
-### 1. Sanfew Serum Component Collector
+### 1. Sanfew Serum Snakeweed Collector
 Automates snakeweed collection in Karamja using fairy rings and GE banking.
 - Efficient fairy ring navigation
-- Smart vine detection and collection
+- Smart snakeweed detection and collection
 - Automated banking at GE
 
-### 2. Blast Furnace Steel Bar Maker
-Maximizes smithing XP through automated steel bar production.
+### 2. Blast Furnace Steel and Adamantite Bar Smelters
+Maximizes smithing XP through automated steel/adamantite bar production.
 - Coal bag and stamina potion support
 - Real-time XP tracking
 - Optimized state management
