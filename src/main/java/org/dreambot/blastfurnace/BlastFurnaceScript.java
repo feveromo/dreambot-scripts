@@ -170,6 +170,20 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
             return 600;
         }
 
+        // Check for required materials
+        if (!Bank.contains(COAL_ID) || !Bank.contains(IRON_ORE_ID)) {
+            Logger.log("Out of materials!");
+            if (!Bank.contains(COAL_ID)) {
+                Logger.log("No coal remaining in bank.");
+            }
+            if (!Bank.contains(IRON_ORE_ID)) {
+                Logger.log("No iron ore remaining in bank.");
+            }
+            Logger.log("Stopping script...");
+            stop();
+            return 0;
+        }
+
         // First priority: deposit completed bars
         if (Inventory.contains(STEEL_BAR_ID)) {
             Logger.log("Depositing steel bars...");
