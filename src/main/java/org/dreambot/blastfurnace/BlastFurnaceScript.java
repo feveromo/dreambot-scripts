@@ -84,6 +84,18 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
     private int startXP;
     private int barsMade;
 
+    // Add these constants near the top of the class with other constants
+    private static final double MAX_XP_PER_HOUR = 95400.0;
+    private static final int MAX_BARS_PER_HOUR = 5400;
+    private static final double XP_PER_BAR = 17.5;
+
+    // Current prices
+    private static final int STEEL_BAR_PRICE = 469;
+    private static final int IRON_ORE_PRICE = 158;
+    private static final int COAL_PRICE = 149;
+    private static final int STAMINA_POT_PRICE = 10025 / 4; // Price per dose
+    private static final int HOURLY_FEE = 72000;
+
     /**
      * Script states representing each stage of the steel bar production process.
      * The script transitions between these states in a cycle to maintain continuous production.
@@ -492,7 +504,7 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
     public void onPaint(Graphics g) {
         // Create a semi-transparent black background
         g.setColor(new Color(0, 0, 0, 180));
-        g.fillRect(5, 5, 250, 100);  
+        g.fillRect(5, 5, 250, 160);  // Made taller to accommodate more stats
 
         // Set text color to white
         g.setColor(Color.WHITE);
@@ -508,6 +520,15 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
         String xpGained = String.format("%,d", getXPGained());
         String xpPerHour = String.format("%,d", getXPPerHour());
         g.drawString("XP: " + xpGained + " (" + xpPerHour + "/hr)", 10, y);
+        y += 20;
+
+        // Calculate and display profit stats
+        BlastFurnaceStats stats = calculateStats();
+        g.drawString(String.format("Profit/hr: %,d gp", stats.profit()), 10, y);
+        y += 20;
+        g.drawString(String.format("Efficiency: %.1f%%", stats.efficiency()), 10, y);
+        y += 20;
+        g.drawString(String.format("Bars/hr: %,d", stats.barsPerHour()), 10, y);
         y += 20;
         
         // Add run energy display
@@ -543,5 +564,91 @@ public class BlastFurnaceScript extends AbstractScript implements PaintListener 
     private int getXPPerHour() {
         double timeRan = (System.currentTimeMillis() - startTime) / 3600000.0;
         return (int) (getXPGained() / timeRan);
+    }
+
+    // Add this method to calculate stats
+    private BlastFurnaceStats calculateStats() {
+        double currentXpPerHour = getXPPerHour();
+        
+        // If we just started (XP/hr is 0), return all zeros
+        if (currentXpPerHour == 0) {
+            return new BlastFurnaceStats(0, 0, 0, 0, 0, new Costs(0, 0, 0, 0));
+        }
+        
+        // Rest of calculation remains the same
+        double efficiencyRatio = currentXpPerHour / MAX_XP_PER_HOUR;
+        int barsPerHour = (int) Math.floor(MAX_BARS_PER_HOUR * efficiencyRatio);
+        
+        int ironOreCost = barsPerHour * IRON_ORE_PRICE;
+        int coalCost = barsPerHour * COAL_PRICE;
+        int staminaCost = 9 * STAMINA_POT_PRICE;
+        
+        Costs costs = new Costs(
+            ironOreCost,
+            coalCost,
+            staminaCost,
+            HOURLY_FEE
+        );
+        
+        int totalCosts = ironOreCost + coalCost + staminaCost + HOURLY_FEE;
+        int revenue = barsPerHour * STEEL_BAR_PRICE;
+        int profit = revenue - totalCosts;
+        
+        double efficiency = (currentXpPerHour / MAX_XP_PER_HOUR) * 100;
+        
+        return new BlastFurnaceStats(
+            barsPerHour,
+            efficiency,
+            profit,
+            totalCosts,
+            revenue,
+            costs
+        );
+    }
+
+    // Remove the record definitions and replace with static inner classes
+    private static class BlastFurnaceStats {
+        private final int barsPerHour;
+        private final double efficiency;
+        private final int profit;
+        private final int totalCosts;
+        private final int revenue;
+        private final Costs costs;
+
+        public BlastFurnaceStats(int barsPerHour, double efficiency, int profit, 
+                               int totalCosts, int revenue, Costs costs) {
+            this.barsPerHour = barsPerHour;
+            this.efficiency = efficiency;
+            this.profit = profit;
+            this.totalCosts = totalCosts;
+            this.revenue = revenue;
+            this.costs = costs;
+        }
+
+        public int barsPerHour() { return barsPerHour; }
+        public double efficiency() { return efficiency; }
+        public int profit() { return profit; }
+        public int totalCosts() { return totalCosts; }
+        public int revenue() { return revenue; }
+        public Costs costs() { return costs; }
+    }
+
+    private static class Costs {
+        private final int ironOre;
+        private final int coal;
+        private final int stamina;
+        private final int fee;
+
+        public Costs(int ironOre, int coal, int stamina, int fee) {
+            this.ironOre = ironOre;
+            this.coal = coal;
+            this.stamina = stamina;
+            this.fee = fee;
+        }
+
+        public int ironOre() { return ironOre; }
+        public int coal() { return coal; }
+        public int stamina() { return stamina; }
+        public int fee() { return fee; }
     }
 } 
