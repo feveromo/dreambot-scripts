@@ -49,13 +49,76 @@ public class AdamantBarSmelter extends AbstractScript implements PaintListener {
     
     // Blast Furnace locations
     private static final Tile CONVEYOR_BELT_TILE = new Tile(1942, 4967, 0);
-    private static final Tile BAR_DISPENSER_TILE = new Tile(1939, 4963, 0);
+    private static final Tile BAR_DISPENSER_TILE = new Tile(1940, 4964, 0);
     private static final Area BLAST_FURNACE_AREA = new Area(1934, 4958, 1954, 4974, 0);
+
+    // Object IDs
+    private static final int CONVEYOR_BELT_ID = 9100;
+    private static final int BAR_DISPENSER_ID = 9092;
+    private static final int BANK_CHEST_ID = 26707;
 
     // Performance tracking
     private long startTime;
     private int startXP;
     private int barsMade;
+
+    // Add these constants near the top of the class with other constants
+    private static final double MAX_XP_PER_HOUR = 101250.0;
+    private static final int MAX_BARS_PER_HOUR = 2700;
+    private static final double XP_PER_BAR = 37.5;
+
+    // Current prices from the provided data
+    private static final int ADAMANT_BAR_PRICE = 1877;
+    private static final int ADAMANTITE_ORE_PRICE = 1051;
+    private static final int COAL_PRICE = 152;
+    private static final int STAMINA_POT_PRICE = 9974 / 4; // Price per dose
+    private static final int HOURLY_FEE = 72000;
+
+    // Add these inner classes for stats tracking
+    private static class BlastFurnaceStats {
+        private final int barsPerHour;
+        private final double efficiency;
+        private final int profit;
+        private final int totalCosts;
+        private final int revenue;
+        private final Costs costs;
+
+        public BlastFurnaceStats(int barsPerHour, double efficiency, int profit, 
+                               int totalCosts, int revenue, Costs costs) {
+            this.barsPerHour = barsPerHour;
+            this.efficiency = efficiency;
+            this.profit = profit;
+            this.totalCosts = totalCosts;
+            this.revenue = revenue;
+            this.costs = costs;
+        }
+
+        public int barsPerHour() { return barsPerHour; }
+        public double efficiency() { return efficiency; }
+        public int profit() { return profit; }
+        public int totalCosts() { return totalCosts; }
+        public int revenue() { return revenue; }
+        public Costs costs() { return costs; }
+    }
+
+    private static class Costs {
+        private final int adamantOre;
+        private final int coal;
+        private final int stamina;
+        private final int fee;
+
+        public Costs(int adamantOre, int coal, int stamina, int fee) {
+            this.adamantOre = adamantOre;
+            this.coal = coal;
+            this.stamina = stamina;
+            this.fee = fee;
+        }
+
+        public int adamantOre() { return adamantOre; }
+        public int coal() { return coal; }
+        public int stamina() { return stamina; }
+        public int fee() { return fee; }
+    }
 
     /**
      * Script states representing each stage of the adamantite bar production process.
@@ -120,25 +183,9 @@ public class AdamantBarSmelter extends AbstractScript implements PaintListener {
             return 600;
         }
 
-        // Handle stamina potions
-        if (Walking.getRunEnergy() <= RUN_ENERGY_THRESHOLD) {
-            for (int potionId : STAMINA_POTION_IDS) {
-                if (Inventory.contains(potionId)) {
-                    Inventory.interact(potionId, "Drink");
-                    Sleep.sleepUntil(() -> Walking.getRunEnergy() > RUN_ENERGY_THRESHOLD, 2000);
-                    break;
-                } else if (Bank.contains(potionId)) {
-                    Bank.withdraw(potionId, 1);
-                    Sleep.sleepUntil(() -> Inventory.contains(potionId), 1200);
-                    Inventory.interact(potionId, "Drink");
-                    Sleep.sleepUntil(() -> Walking.getRunEnergy() > RUN_ENERGY_THRESHOLD, 2000);
-                    break;
-                }
-            }
-        }
-
-        // Deposit bars if we have them
+        // First priority: deposit completed bars
         if (Inventory.contains(ADAMANTITE_BAR_ID)) {
+            Logger.log("Depositing adamantite bars...");
             Bank.depositAll(ADAMANTITE_BAR_ID);
             barsMade += Inventory.count(ADAMANTITE_BAR_ID);
             isCoalCycle = true;
@@ -146,23 +193,54 @@ public class AdamantBarSmelter extends AbstractScript implements PaintListener {
             return 600;
         }
 
-        // Make sure we have coal bag
-        if (!Inventory.contains(COAL_BAG_ID)) {
-            Bank.withdraw(COAL_BAG_ID, 1);
-            return 600;
-        }
-
-        // Clear inventory except coal bag
+        // Clear inventory except coal bag before handling stamina
         if (Inventory.contains(item -> item.getID() != COAL_BAG_ID)) {
+            Logger.log("Depositing all items except coal bag");
             Bank.depositAllExcept(COAL_BAG_ID);
             return 600;
         }
 
-        // Handle coal cycle (double coal deposit)
+        // Handle stamina potions after depositing items
+        if (Walking.getRunEnergy() <= RUN_ENERGY_THRESHOLD) {
+            Logger.log("Run energy low (" + Walking.getRunEnergy() + "%), checking for stamina potion...");
+            
+            // Check inventory first
+            for (int potionId : STAMINA_POTION_IDS) {
+                if (Inventory.contains(potionId)) {
+                    Logger.log("Drinking stamina potion...");
+                    Inventory.interact(potionId, "Drink");
+                    Sleep.sleepUntil(() -> Walking.getRunEnergy() > RUN_ENERGY_THRESHOLD, 2000);
+                    return 600;
+                }
+            }
+
+            // If no stamina in inventory, try to withdraw one
+            for (int potionId : STAMINA_POTION_IDS) {
+                if (Bank.contains(potionId)) {
+                    Logger.log("Withdrawing stamina potion...");
+                    Bank.withdraw(potionId, 1);
+                    Sleep.sleepUntil(() -> Inventory.contains(potionId), 1200);
+                    if (Inventory.interact(potionId, "Drink")) {
+                        Sleep.sleepUntil(() -> Walking.getRunEnergy() > RUN_ENERGY_THRESHOLD, 2000);
+                        return 600;
+                    }
+                }
+            }
+        }
+
+        // Make sure we have coal bag
+        if (!Inventory.contains(COAL_BAG_ID)) {
+            Logger.log("Withdrawing coal bag...");
+            Bank.withdraw(COAL_BAG_ID, 1);
+            return 600;
+        }
+
+        // Handle coal cycle (need 3 coal per adamant bar)
         if (isCoalCycle) {
             if (!coalBagFull) {
                 // Fill coal bag first
                 if (Inventory.interact(COAL_BAG_ID, "Fill")) {
+                    Logger.log("Filled coal bag");
                     coalBagFull = true;
                     return 600;
                 }
@@ -180,6 +258,7 @@ public class AdamantBarSmelter extends AbstractScript implements PaintListener {
             if (!coalBagFull) {
                 // Fill coal bag
                 if (Inventory.interact(COAL_BAG_ID, "Fill")) {
+                    Logger.log("Filled coal bag");
                     coalBagFull = true;
                     return 600;
                 }
@@ -345,20 +424,39 @@ public class AdamantBarSmelter extends AbstractScript implements PaintListener {
      */
     @Override
     public void onPaint(Graphics g) {
+        // Create a semi-transparent black background
         g.setColor(new Color(0, 0, 0, 180));
-        g.fillRect(5, 5, 250, 100);  
+        g.fillRect(5, 5, 250, 160);  // Made taller to accommodate more stats
 
+        // Set text color to white
         g.setColor(Color.WHITE);
+        
+        // Draw stats
         int y = 20;
         g.drawString("DreamBot Adamant Bar Smelter", 10, y);
         y += 20;
         g.drawString("Time running: " + getRunTime(), 10, y);
         y += 20;
-        g.drawString("XP: " + getXPGained() + " (" + getXPPerHour() + "/hr)", 10, y);
+        
+        // XP stats with commas for readability
+        String xpGained = String.format("%,d", getXPGained());
+        String xpPerHour = String.format("%,d", getXPPerHour());
+        g.drawString("XP: " + xpGained + " (" + xpPerHour + "/hr)", 10, y);
         y += 20;
-        g.drawString("Bars made: " + barsMade + " (" + getBarsPerHour() + "/hr)", 10, y);
+
+        // Calculate and display profit stats
+        BlastFurnaceStats stats = calculateStats();
+        g.drawString(String.format("Profit/hr: %,d gp", stats.profit()), 10, y);
         y += 20;
-        g.drawString("State: " + state.toString(), 10, y);
+        g.drawString(String.format("Efficiency: %.1f%%", stats.efficiency()), 10, y);
+        y += 20;
+        g.drawString(String.format("Bars/hr: %,d", stats.barsPerHour()), 10, y);
+        y += 20;
+        
+        // Add run energy display
+        g.drawString("Run Energy: " + Walking.getRunEnergy() + "%", 10, y);
+        y += 20;
+        g.drawString("Current state: " + state.toString(), 10, y);
     }
 
     /**
@@ -399,5 +497,45 @@ public class AdamantBarSmelter extends AbstractScript implements PaintListener {
     private int getBarsPerHour() {
         double timeRan = (System.currentTimeMillis() - startTime) / 3600000.0;
         return (int) (barsMade / timeRan);
+    }
+
+    // Add this method to calculate stats
+    private BlastFurnaceStats calculateStats() {
+        double currentXpPerHour = getXPPerHour();
+        
+        // If we just started (XP/hr is 0), return all zeros
+        if (currentXpPerHour == 0) {
+            return new BlastFurnaceStats(0, 0, 0, 0, 0, new Costs(0, 0, 0, 0));
+        }
+        
+        double efficiencyRatio = currentXpPerHour / MAX_XP_PER_HOUR;
+        int barsPerHour = (int) Math.floor(MAX_BARS_PER_HOUR * efficiencyRatio);
+        
+        // Calculate costs (3 coal per adamant bar)
+        int adamantOreCost = barsPerHour * ADAMANTITE_ORE_PRICE;
+        int coalCost = barsPerHour * 3 * COAL_PRICE; // 3 coal per bar
+        int staminaCost = 9 * STAMINA_POT_PRICE;
+        
+        Costs costs = new Costs(
+            adamantOreCost,
+            coalCost,
+            staminaCost,
+            HOURLY_FEE
+        );
+        
+        int totalCosts = adamantOreCost + coalCost + staminaCost + HOURLY_FEE;
+        int revenue = barsPerHour * ADAMANT_BAR_PRICE;
+        int profit = revenue - totalCosts;
+        
+        double efficiency = (currentXpPerHour / MAX_XP_PER_HOUR) * 100;
+        
+        return new BlastFurnaceStats(
+            barsPerHour,
+            efficiency,
+            profit,
+            totalCosts,
+            revenue,
+            costs
+        );
     }
 } 
